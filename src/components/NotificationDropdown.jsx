@@ -1,5 +1,4 @@
 import { Volume2, Droplets, AlertTriangle } from 'lucide-react'
-import { notifications } from '../data/mockData'
 
 const iconMap = {
   volume: Volume2,
@@ -13,7 +12,7 @@ const toneStyles = {
   orange: 'bg-amber-50 text-amber-500 dark:bg-amber-500/15 dark:text-amber-400',
 }
 
-export function NotificationDropdown({ open, onMarkAllRead }) {
+export function NotificationDropdown({ open, onMarkAllRead, notifications = [] }) {
   if (!open) return null
 
   return (
@@ -35,6 +34,11 @@ export function NotificationDropdown({ open, onMarkAllRead }) {
         </button>
       </div>
       <ul className="max-h-[320px] divide-y divide-slate-100 dark:divide-slate-700">
+        {notifications.length === 0 && (
+          <li className="px-5 py-8 text-center text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            No active alerts right now. Alerts appear when live sensor thresholds suggest attention.
+          </li>
+        )}
         {notifications.map((n) => {
           const Icon = iconMap[n.icon] || AlertTriangle
           return (

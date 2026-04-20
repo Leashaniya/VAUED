@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { Bell, Moon, Sun, User } from 'lucide-react'
 import { SystemOnlineBadge } from './LiveBadge'
 import { NotificationDropdown } from './NotificationDropdown'
@@ -12,6 +12,14 @@ export function Header({
   setNotificationsOpen,
   profileOpen,
   setProfileOpen,
+  notifications = [],
+  activeBabyName = 'Baby Jamie',
+  activeBabyMeta = '',
+  parentName = '',
+  parentEmail = '',
+  onAddBabyProfile,
+  onSwitchBabyProfile,
+  onLogout,
 }) {
   const bellRef = useRef(null)
   const profileRef = useRef(null)
@@ -30,18 +38,41 @@ export function Header({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [setNotificationsOpen, setProfileOpen])
 
+  const hasActiveNotifications = notifications.length > 0
+
+  const welcomeLine = useMemo(() => {
+    if (!parentName?.trim() && !parentEmail) return null
+    const first = parentName?.trim()?.split(/\s+/)[0]
+    if (first) return `Welcome back, ${first}`
+    const local = parentEmail?.split('@')[0]
+    return local ? `Welcome back, ${local}` : null
+  }, [parentName, parentEmail])
+
   return (
     <header
       className={`flex w-full shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 ${headerPaddingY} dark:border-slate-800`}
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
-          Nursery Overview:{' '}
-          <span className="font-semibold text-cyan-500 dark:text-cyan-400">
-            Baby Jamie
-          </span>
-        </h1>
-        <SystemOnlineBadge />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
+            Nursery Overview:{' '}
+            <span className="font-semibold" style={{ color: 'var(--sbm-accent)' }}>
+              {activeBabyName}
+            </span>
+          </h1>
+          {activeBabyMeta && (
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+              style={{ backgroundColor: 'var(--sbm-accent-soft)', color: 'var(--sbm-accent-text)' }}
+            >
+              {activeBabyMeta}
+            </span>
+          )}
+          <SystemOnlineBadge />
+        </div>
+        {welcomeLine && (
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{welcomeLine}</p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -57,11 +88,14 @@ export function Header({
             aria-haspopup="dialog"
           >
             <Bell className="h-[18px] w-[18px]" strokeWidth={2} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#1e293b]" />
+            {hasActiveNotifications && (
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#1e293b]" />
+            )}
           </button>
           <NotificationDropdown
             open={notificationsOpen}
             onMarkAllRead={() => setNotificationsOpen(false)}
+            notifications={notifications}
           />
         </div>
 
@@ -87,15 +121,32 @@ export function Header({
             }}
             className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition ${
               profileOpen
-                ? 'border-cyan-400 bg-cyan-50 text-cyan-600 dark:border-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300'
+                ? 'bg-slate-50 dark:bg-slate-700/50'
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-[#1e293b] dark:text-slate-300 dark:hover:bg-slate-700/80'
             }`}
+            style={
+              profileOpen
+                ? {
+                    borderColor: 'var(--sbm-accent)',
+                    color: 'var(--sbm-accent)',
+                  }
+                : undefined
+            }
             aria-expanded={profileOpen}
             aria-haspopup="menu"
           >
             <User className="h-[18px] w-[18px]" strokeWidth={2} />
           </button>
-          <ProfileDropdown open={profileOpen} />
+          <ProfileDropdown
+            open={profileOpen}
+            onAddBaby={onAddBabyProfile}
+            onSwitchBaby={onSwitchBabyProfile}
+            onLogout={onLogout}
+            activeBabyName={activeBabyName}
+            activeBabyMeta={activeBabyMeta}
+            parentName={parentName}
+            parentEmail={parentEmail}
+          />
         </div>
       </div>
     </header>

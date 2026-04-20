@@ -40,6 +40,12 @@
  *
  * 7) Average cry duration (validation / debug)
  *    Mean of cry_duration (seconds) over crying rows in filtered set.
+ *
+ * 8) Period comparison (chatbot + reasoning)
+ *    `comparison` object: current vs previous **equivalent time span** (see previousWindowRows),
+ *    with the **same** advanced filters + chart selections applied to both slices.
+ *    Deltas: episode count diff, wet-share **percentage points** among cries, mean temp diff,
+ *    headline avg cry minutes/day diff; `strongestFactor` picks the largest normalized move.
  * -----------------------------------------------------------------------------
  */
 
@@ -382,6 +388,121 @@ function cryDurationTrend(currentRows, previousRows) {
   return 'stable'
 }
 
+/**
+ * Period-over-period comparison for the **same** dimensional + chart filters as the visible charts.
+ * Current window = `filtered`; previous window = `prev` (same span as range tab, immediately before).
+ * Deltas are raw differences (not %), except wet share which is **percentage points** among crying episodes.
+ * When `prev` is empty or current has no rows, deltas stay null and `available` is false (no invented data).
+ */
+function buildPeriodComparison(filtered, prev) {
+  const empty = (reason) => ({
+    available: false,
+    reason,
+    current: null,
+    previous: null,
+    cryingEpisodeDiff: null,
+    wetCryingPctDiff: null,
+    avgTempDiffCelsius: null,
+    avgCryDurationDiffMinutes: null,
+    strongestFactor: null,
+  })
+
+  if (!filtered.length) return empty('empty_current_window')
+  if (!prev.length) return empty('no_previous_window')
+
+  const curCry = filtered.filter((r) => r.crying).length
+  const prevCry = prev.filter((r) => r.crying).length
+  const cryingEpisodeDiff = curCry - prevCry
+
+  const donutCur = buildCryingWetDonut(filtered)
+  const donutPrev = buildCryingWetDonut(prev)
+  const curWetPct = curCry > 0 ? donutCur.correlationPct : null
+  const prevWetPct = prevCry > 0 ? donutPrev.correlationPct : null
+  const wetCryingPctDiff =
+    curWetPct !== null && prevWetPct !== null ? Math.round((curWetPct - prevWetPct) * 10) / 10 : null
+
+  const curTemp = buildAvgTemp(filtered)
+  const prevTemp = buildAvgTemp(prev)
+  const avgTempDiffCelsius =
+    curTemp !== null && prevTemp !== null ? Math.round((curTemp - prevTemp) * 10) / 10 : null
+
+  const curMin = buildAvgMinPerDaySummary(filtered)
+  const prevMin = buildAvgMinPerDaySummary(prev)
+  const avgCryDurationDiffMinutes =
+    Number.isFinite(curMin) && Number.isFinite(prevMin) ? Math.round((curMin - prevMin) * 10) / 10 : null
+
+  const current = {
+    rowCount: filtered.length,
+    cryingEpisodes: curCry,
+    wetCryingPctAmongCries: curWetPct,
+    avgTempCelsius: curTemp,
+    avgCryMinutesPerDay: Number.isFinite(curMin) ? curMin : null,
+  }
+  const previous = {
+    rowCount: prev.length,
+    cryingEpisodes: prevCry,
+    wetCryingPctAmongCries: prevWetPct,
+    avgTempCelsius: prevTemp,
+    avgCryMinutesPerDay: Number.isFinite(prevMin) ? prevMin : null,
+  }
+
+  const candidates = []
+  const pushScore = (key, label, delta, score) => {
+    if (!Number.isFinite(delta) || delta === 0 || !Number.isFinite(score)) return
+    candidates.push({ key, label, delta, score })
+  }
+
+  const cryDenom = Math.max(1, curCry, prevCry)
+  pushScore('crying_episodes', 'crying episode count', cryingEpisodeDiff, Math.abs(cryingEpisodeDiff) / cryDenom)
+
+  if (wetCryingPctDiff !== null) {
+    pushScore(
+      'wet_crying_share',
+      'wet-related share of crying episodes (percentage points)',
+      wetCryingPctDiff,
+      Math.abs(wetCryingPctDiff) / 100,
+    )
+  }
+
+  if (avgTempDiffCelsius !== null) {
+    pushScore('avg_temperature', 'average ambient temperature (°C)', avgTempDiffCelsius, Math.abs(avgTempDiffCelsius) / 3)
+  }
+
+  if (avgCryDurationDiffMinutes !== null) {
+    const minDenom = Math.max(0.5, Math.abs(prevMin), Math.abs(curMin))
+    pushScore(
+      'avg_cry_minutes_per_day',
+      'average crying minutes per calendar day',
+      avgCryDurationDiffMinutes,
+      Math.abs(avgCryDurationDiffMinutes) / minDenom,
+    )
+  }
+
+  candidates.sort((a, b) => b.score - a.score)
+  const top = candidates[0] ?? null
+  const dir = (d) => (d > 0 ? 'increased' : 'decreased')
+  const strongestFactor = top
+    ? {
+        dimension: top.key,
+        label: top.label,
+        delta: top.delta,
+        narrative: `${top.label.charAt(0).toUpperCase() + top.label.slice(1)} ${dir(top.delta)} the most between the current and previous window (same filters and chart selection).`,
+      }
+    : null
+
+  return {
+    available: true,
+    reason: null,
+    current,
+    previous,
+    cryingEpisodeDiff,
+    wetCryingPctDiff,
+    avgTempDiffCelsius,
+    avgCryDurationDiffMinutes,
+    strongestFactor,
+  }
+}
+
 /** Build Mon–Sun cry episode counts for the bar chart (formula: see file header section 1). */
 function buildCryByDay(rows) {
   const counts = [0, 0, 0, 0, 0, 0, 0]
@@ -457,7 +578,7 @@ function buildCryingWetDonut(rows) {
   /** Omit zero-value slices so Recharts Pie does not receive invalid segments. */
   const cryingWetDonut = []
   if (wetCry > 0) {
-    cryingWetDonut.push({ name: 'Wet & Crying', value: wetCry, color: '#22d3ee' })
+    cryingWetDonut.push({ name: 'Wet & Crying', value: wetCry, color: 'var(--sbm-accent)' })
   }
   if (dryCry > 0) {
     cryingWetDonut.push({ name: 'Other Crying', value: dryCry, color: '#facc15' })
@@ -687,6 +808,7 @@ function emptyAnalyticsBundle(mode, filters, selections) {
     yMaxDuration: 30,
     tempYDomain: [18, 32],
     badges: { weekCryPct: null, stabilityPct: null, trend: 'stable' },
+    comparison: buildPeriodComparison([], []),
     insights: {
       hasData: false,
       lines: ['No data available for the current filter and chart selections.'],
@@ -743,6 +865,8 @@ export function buildAnalyticsFromRows(
     avgMinPerDaySummary,
     trend,
   })
+
+  const comparison = buildPeriodComparison(filtered, prev)
 
   /** Default domain when there are no daily points (empty filter / no temps). */
   let tempYDomain = [18, 32]
@@ -834,6 +958,7 @@ export function buildAnalyticsFromRows(
       /** 'improving' | 'stable' | 'worse' | 'watch' */
       trend,
     },
+    comparison,
     insights,
     meta: {
       rowCount: filtered.length,

@@ -42,6 +42,15 @@ const tempCategoryOptions = ['all', 'Low', 'Normal', 'High']
  */
 const ANALYTICS_VALIDATION_DEBUG = false
 
+const ANALYTICS_CHAT_INTRO =
+  'I use your current filters, chart selections, and Key Insights — grounded in this page’s historical CSV view (not live “right now” sensors). Ask about trends, badges, wetness vs crying, or comparisons to the prior window — calmly and without medical advice.'
+
+const ANALYTICS_QUICK_PROMPTS = [
+  'Which day has the highest crying?',
+  'What changed compared to previous period?',
+  'Summarize the current analytics view',
+]
+
 function filterModeLabel(id) {
   if (id === '7d') return '7d — last 7 days before latest CSV timestamp'
   if (id === '30d') return '30d — last 30 days before latest CSV timestamp'
@@ -69,15 +78,24 @@ function trendPillLabel(trend) {
   return 'Stable'
 }
 
-function trendPillClass(trend) {
-  if (trend === 'improving')
-    return 'shrink-0 rounded-full bg-cyan-50 px-2.5 py-0.5 text-[10px] font-semibold text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-400'
-  if (trend === 'worse')
-    return 'shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-  return 'shrink-0 rounded-full bg-cyan-50 px-2.5 py-0.5 text-[10px] font-semibold text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-400'
+function getTrendPillAppearance(trend) {
+  if (trend === 'worse') {
+    return {
+      className:
+        'shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+      style: undefined,
+    }
+  }
+  return {
+    className: 'shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold',
+    style: {
+      backgroundColor: 'var(--sbm-accent-soft)',
+      color: 'var(--sbm-accent-text)',
+    },
+  }
 }
 
-export function Analytics({ dark, filter, setFilter }) {
+export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
   const [allRows, setAllRows] = useState([])
   const [loadState, setLoadState] = useState('loading')
   const [loadError, setLoadError] = useState(null)
@@ -213,7 +231,7 @@ export function Analytics({ dark, filter, setFilter }) {
   const cryBadgeText = formatCryWeekBadge(badges.weekCryPct, filter)
   const stabilityBadgeText = formatStabilityBadge(badges.stabilityPct)
   const trendLabel = trendPillLabel(badges.trend)
-  const trendClass = trendPillClass(badges.trend)
+  const trendPill = getTrendPillAppearance(badges.trend)
 
   const durationTicks = useMemo(() => {
     const step = yMaxDuration <= 20 ? 5 : 10
@@ -244,8 +262,18 @@ export function Analytics({ dark, filter, setFilter }) {
         selections: { selectedWeekday, selectedDonutSegment },
         analytics,
         customRange: { customStartDate, customEndDate },
+        activeBaby,
       }),
-    [filter, advancedFilters, selectedWeekday, selectedDonutSegment, analytics, customStartDate, customEndDate],
+    [
+      filter,
+      advancedFilters,
+      selectedWeekday,
+      selectedDonutSegment,
+      analytics,
+      customStartDate,
+      customEndDate,
+      activeBaby,
+    ],
   )
 
   const needsCustomDateSelection = filter === 'custom' && (!customStartDate || !customEndDate)
@@ -366,9 +394,14 @@ export function Analytics({ dark, filter, setFilter }) {
                   onClick={() => setFilter(t.id)}
                   className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition ${
                     active
-                      ? 'bg-cyan-400 text-slate-900 shadow-sm dark:bg-cyan-500 dark:text-slate-950'
+                      ? 'shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
                   }`}
+                  style={
+                    active
+                      ? { backgroundColor: 'var(--sbm-accent)', color: '#0f172a' }
+                      : undefined
+                  }
                 >
                   {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={2} />}
                   {t.label}
@@ -390,7 +423,7 @@ export function Analytics({ dark, filter, setFilter }) {
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -401,7 +434,7 @@ export function Analytics({ dark, filter, setFilter }) {
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                 />
               </label>
             </div>
@@ -427,7 +460,7 @@ export function Analytics({ dark, filter, setFilter }) {
               <select
                 value={advancedFilters.dayOfWeek}
                 onChange={(e) => handleAdvancedFilterChange('dayOfWeek', e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
               >
                 {dayOfWeekOptions.map((value) => (
                   <option key={value} value={value}>
@@ -444,7 +477,7 @@ export function Analytics({ dark, filter, setFilter }) {
               <select
                 value={advancedFilters.timeOfDay}
                 onChange={(e) => handleAdvancedFilterChange('timeOfDay', e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
               >
                 {timeOfDayOptions.map((value) => (
                   <option key={value} value={value}>
@@ -461,7 +494,7 @@ export function Analytics({ dark, filter, setFilter }) {
               <select
                 value={advancedFilters.crySeverity}
                 onChange={(e) => handleAdvancedFilterChange('crySeverity', e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
               >
                 {crySeverityOptions.map((value) => (
                   <option key={value} value={value}>
@@ -478,7 +511,7 @@ export function Analytics({ dark, filter, setFilter }) {
               <select
                 value={advancedFilters.tempCategory}
                 onChange={(e) => handleAdvancedFilterChange('tempCategory', e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 outline-none transition focus:border-[var(--sbm-accent)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
               >
                 {tempCategoryOptions.map((value) => (
                   <option key={value} value={value}>
@@ -497,7 +530,12 @@ export function Analytics({ dark, filter, setFilter }) {
               <button
                 type="button"
                 onClick={() => setSelectedWeekday(null)}
-                className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 font-medium text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300"
+                className="rounded-full border px-2 py-0.5 font-medium"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--sbm-accent) 42%, transparent)',
+                  backgroundColor: 'var(--sbm-accent-soft)',
+                  color: 'var(--sbm-accent-text)',
+                }}
               >
                 Day: {selectedWeekday} ×
               </button>
@@ -546,15 +584,15 @@ export function Analytics({ dark, filter, setFilter }) {
                     tick={{ fill: dark ? '#94a3b8' : '#64748b', fontSize: 11 }}
                   />
                   <YAxis hide />
-                  <Bar dataKey="episodes" fill="#67e8f9" radius={[6, 6, 0, 0]} maxBarSize={40}>
+                  <Bar dataKey="episodes" fill="var(--sbm-accent)" radius={[6, 6, 0, 0]} maxBarSize={40}>
                     {cryByDay.map((entry) => {
                       const isActive = selectedWeekday === entry.day
                       const hasSelection = Boolean(selectedWeekday)
                       return (
                         <Cell
                           key={`cry-day-cell-${entry.day}`}
-                          fill={isActive ? '#06b6d4' : '#67e8f9'}
-                          fillOpacity={hasSelection && !isActive ? 0.4 : 1}
+                          fill="var(--sbm-accent)"
+                          fillOpacity={hasSelection && !isActive ? 0.38 : isActive ? 1 : 0.72}
                           style={{ cursor: 'pointer' }}
                           onClick={() => handleWeekdayBarClick(entry.day)}
                         />
@@ -589,8 +627,8 @@ export function Analytics({ dark, filter, setFilter }) {
                     <linearGradient id="tempFillAnalytics" x1="0" y1="0" x2="0" y2="1">
                       <stop
                         offset="0%"
-                        stopColor={dark ? '#22d3ee' : '#94a3b8'}
-                        stopOpacity={dark ? 0.2 : 0.25}
+                        stopColor="var(--sbm-accent)"
+                        stopOpacity={dark ? 0.22 : 0.2}
                       />
                       <stop
                         offset="100%"
@@ -612,7 +650,7 @@ export function Analytics({ dark, filter, setFilter }) {
                   <Area
                     type="monotone"
                     dataKey="temp"
-                    stroke="#22d3ee"
+                    stroke="var(--sbm-accent)"
                     strokeWidth={2}
                     fill="url(#tempFillAnalytics)"
                     dot={false}
@@ -628,7 +666,10 @@ export function Analytics({ dark, filter, setFilter }) {
             </div>
             <div className="mt-3 flex flex-wrap gap-6 text-[11px] font-medium text-slate-600 dark:text-slate-300">
               <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--sbm-accent)' }}
+                />
                 Temperature
               </span>
               <span className="flex items-center gap-2">
@@ -690,7 +731,10 @@ export function Analytics({ dark, filter, setFilter }) {
             </div>
             <div className="mt-2 flex flex-col gap-2 text-xs font-medium">
               <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--sbm-accent)' }}
+                />
                 Wet & Crying - {legendWetCry} recorded events
               </span>
               <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
@@ -706,7 +750,9 @@ export function Analytics({ dark, filter, setFilter }) {
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 Daily Average Cry Duration
               </span>
-              <span className={trendClass}>{trendLabel}</span>
+              <span className={trendPill.className} style={trendPill.style}>
+                {trendLabel}
+              </span>
             </div>
             <p className="text-2xl font-bold text-slate-900 dark:text-white">
               {avgMinDisplay}{' '}
@@ -736,12 +782,15 @@ export function Analytics({ dark, filter, setFilter }) {
                     tick={{ fill: dark ? '#94a3b8' : '#94a3b8', fontSize: 11 }}
                     width={32}
                   />
-                  <Bar dataKey="min" fill="#67e8f9" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="min" fill="var(--sbm-accent)" radius={[6, 6, 0, 0]} maxBarSize={36} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              <span className="h-2 w-2 rounded-full bg-cyan-400" />
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: 'var(--sbm-accent)' }}
+              />
               Average Daily Cry Duration (min)
             </div>
           </div>
@@ -757,7 +806,13 @@ export function Analytics({ dark, filter, setFilter }) {
                 Analytical Summary
               </h3>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2.5 py-1 text-[10px] font-semibold text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-1 text-[10px] font-semibold"
+              style={{
+                backgroundColor: 'var(--sbm-accent-soft)',
+                color: 'var(--sbm-accent-text)',
+              }}
+            >
               <Sparkles className="h-3 w-3" />
               Live with active filters
             </span>
@@ -770,20 +825,38 @@ export function Analytics({ dark, filter, setFilter }) {
                   key={`insight-observation-${idx}`}
                   className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/40"
                 >
-                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-cyan-500 shadow-sm dark:bg-slate-800 dark:text-cyan-300">
+                  <span
+                    className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-800"
+                    style={{ color: 'var(--sbm-accent)' }}
+                  >
                     <Lightbulb className="h-3.5 w-3.5" />
                   </span>
                   <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{line}</p>
                 </div>
               ))}
 
-              <div className="rounded-xl border border-cyan-200/80 bg-cyan-50/70 px-3 py-3 dark:border-cyan-500/30 dark:bg-cyan-500/10">
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+              <div
+                className="rounded-xl border px-3 py-3"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--sbm-accent) 40%, transparent)',
+                  backgroundColor: 'var(--sbm-accent-soft)',
+                }}
+              >
+                <p
+                  className="mb-1 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--sbm-accent-text)' }}
+                >
                   Action Suggestion
                 </p>
                 <div className="flex items-start gap-2">
-                  <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" />
-                  <p className="text-sm font-medium leading-relaxed text-cyan-900 dark:text-cyan-100">
+                  <ArrowRight
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    style={{ color: 'var(--sbm-accent-text)' }}
+                  />
+                  <p
+                    className="text-sm font-medium leading-relaxed"
+                    style={{ color: 'var(--sbm-accent-text)' }}
+                  >
                     {insights.lines[insights.lines.length - 1]}
                   </p>
                 </div>
@@ -968,7 +1041,14 @@ export function Analytics({ dark, filter, setFilter }) {
           </div>
         )}
       </div>
-      <AnalyticsChatbot context={chatbotContext} />
+      <AnalyticsChatbot
+        context={chatbotContext}
+        launcherLabel="Analytics assistant"
+        panelTitle="Analytics assistant"
+        introMessage={ANALYTICS_CHAT_INTRO}
+        quickPrompts={ANALYTICS_QUICK_PROMPTS}
+        inputPlaceholder="Ask about charts, filters, trends, or insights…"
+      />
     </div>
   )
 }

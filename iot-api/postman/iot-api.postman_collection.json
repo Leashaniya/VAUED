@@ -1,0 +1,112 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-iot-api-collection",
+    "name": "IoT API",
+    "description": "Sensor readings API. Optional `sensorId` query param is only on `GET /api/readings` (list all). Writes and `GET /api/readings/sensors/:id` use the path. Each row has one numeric `reading`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://192.168.1.12:8888" },
+    { "key": "apiKey", "value": "" },
+    { "key": "readingId", "value": "", "description": "Set automatically after Create reading, or paste a MongoDB _id" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Readings",
+      "item": [
+        {
+          "name": "Create reading",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const j = pm.response.json();",
+                  "  if (j.id) pm.collectionVariables.set('readingId', j.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reading\": 22.5\n}"
+            },
+            "url": "{{baseUrl}}/api/readings/sensors/1"
+          }
+        },
+        {
+          "name": "List readings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": "{{baseUrl}}/api/readings?sensorId=1&limit=20&skip=0"
+          }
+        },
+        {
+          "name": "List readings for sensor",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": "{{baseUrl}}/api/readings/sensors/2?limit=10"
+          }
+        },
+        {
+          "name": "Get reading by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": "{{baseUrl}}/api/readings/{{readingId}}"
+          }
+        },
+        {
+          "name": "Chart data (bucketed)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": "{{baseUrl}}/api/readings/chart?range=1h"
+          }
+        },
+        {
+          "name": "Current readings (latest per sensor)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": "{{baseUrl}}/api/readings/current"
+          }
+        },
+        {
+          "name": "Batch create readings (one sensor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"readings\": [19.2, 20.0, 21.5]\n}"
+            },
+            "url": "{{baseUrl}}/api/readings/sensors/3/batch"
+          }
+        }
+      ]
+    }
+  ]
+}

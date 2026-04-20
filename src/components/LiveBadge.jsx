@@ -9,7 +9,10 @@ export function LiveBadge() {
 
 export function TodayPill() {
   return (
-    <span className="rounded-full bg-cyan-100 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300">
+    <span
+      className="rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{ backgroundColor: 'var(--sbm-accent-soft)', color: 'var(--sbm-accent-text)' }}
+    >
       Today
     </span>
   )
