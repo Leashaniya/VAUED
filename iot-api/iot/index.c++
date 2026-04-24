@@ -1,6 +1,6 @@
 /****************************
 ESP32 Multi-Sensor Baby Monitor
-Sensors: DHT11, Liquid/Wetness, Sound
+Sensors: DHT11, Liquid/Wetness, Sound, LDR
 Actuator: Servo motor
 Backend: custom IoT API (JSON + X-API-Key)
 ****************************/
@@ -11,8 +11,8 @@ Backend: custom IoT API (JSON + X-API-Key)
 #include <ESP32Servo.h>
 
 // --------------------- WiFi ---------------------
-char ssid[] = "Dialog 4G 290";
-char pass[] = "FF0313cD";
+char ssid[] = "Galaxy A04s FB06";
+char pass[] = "12345678";
 
 // --------------------- IoT API ---------------------
 #define API_HOST "192.168.8.199"
@@ -24,6 +24,7 @@ char pass[] = "FF0313cD";
 #define SENSOR_HUMIDITY "2"
 #define SENSOR_WETNESS "3"
 #define SENSOR_SOUND "4"
+#define SENSOR_LDR "5"  // New Sensor ID for Light Status
 
 // --------------------- Sensor Pins ---------------------
 #define DHTPIN 4
@@ -32,6 +33,9 @@ char pass[] = "FF0313cD";
 #define MOISTURE_PIN 35
 #define SOUND_PIN 34
 #define SERVO_PIN 13
+#define LDR_PIN 32    // Pin for LDR 1
+#define LDR_PIN_2 33  // Pin for LDR 2
+
 #define SOUND_THRESHOLD 1000
 #define WETNESS_THRESHOLD 700
 
@@ -53,6 +57,7 @@ float lastTemp = NAN;
 float lastHumidity = NAN;
 int lastWetness = 0;
 int lastSound = 0;
+int lastLdrStatus = 1; // 1 for safe, 0 for unsafe
 bool haveDht = false;
 
 // --------------------- Servo Variables ---------------------
@@ -63,11 +68,9 @@ int servoDir = 1;
 unsigned long lastServoMove = 0;
 const unsigned long SERVO_STEP_DELAY = 0;
 
-// --------------------- Servo range ---------------------
 const int SERVO_MIN = 45;
 const int SERVO_MAX = 135;
 
-// --------------------- Swing control ---------------------
 int swingCount = 0;
 int maxSwings = 5;
 
@@ -81,8 +84,7 @@ bool postReading(const char* sensorId, double value) {
   }
 
   HTTPClient http;
-  String url =
-      String("http://") + API_HOST + ":" + String(API_PORT) + "/api/readings/sensors/" + sensorId;
+  String url = String("http://") + API_HOST + ":" + String(API_PORT) + "/api/readings/sensors/" + sensorId;
 
   if (!http.begin(url)) {
     Serial.println("[API] http.begin failed");
@@ -112,15 +114,15 @@ void pushReadingsToApi() {
   }
   postReading(SENSOR_WETNESS, (double)lastWetness);
   postReading(SENSOR_SOUND, (double)lastSound);
+  postReading(SENSOR_LDR, (double)lastLdrStatus); // Push LDR status to API
 }
 
 void setup() {
-
   Serial.begin(115200);
 
   Serial.println("======================================");
   Serial.println("ESP32 Baby Monitor System Starting...");
-  Serial.println("Sensors: DHT11 | Wetness | Sound");
+  Serial.println("Sensors: DHT11 | Wetness | Sound | LDR");
   Serial.println("Servo: GPIO 13");
   Serial.println("======================================");
 
@@ -133,23 +135,24 @@ void setup() {
     Serial.print(".");
   }
   Serial.println();
+  
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("WiFi OK, IP: ");
     Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("WiFi failed — will retry in loop");
   }
 
   dht.begin();
-
   myServo.attach(SERVO_PIN);
   myServo.write(servoPos);
+
+  // Initialize LDR pins
+  pinMode(LDR_PIN, INPUT);
+  pinMode(LDR_PIN_2, INPUT);
 
   Serial.println("System Ready.");
 }
 
 void loop() {
-
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.reconnect();
     delay(1000);
@@ -157,51 +160,41 @@ void loop() {
 
   unsigned long currentMillis = millis();
 
+  // --------- LDR Sensor Logic ----------
+  int ldrValue = digitalRead(LDR_PIN);
+  int ldrValue2 = digitalRead(LDR_PIN_2);
+
+  if (ldrValue == HIGH || ldrValue2 == HIGH) {
+    // If either sensor detects low light (assuming HIGH means dark for your sensor)
+    if(lastLdrStatus != 0) Serial.println("Baby is unsafe (low light detected)");
+    lastLdrStatus = 0; 
+  } else {
+    if(lastLdrStatus != 1) Serial.println("Baby is safe (light intact)");
+    lastLdrStatus = 1;
+  }
+
   // --------- DHT11 ----------
   if (currentMillis - lastDHTRead >= DHT_INTERVAL) {
-
     lastDHTRead = currentMillis;
-
     float humidity = dht.readHumidity();
     float temperature = dht.readTemperature();
 
     if (!isnan(humidity) && !isnan(temperature)) {
-
       haveDht = true;
       lastTemp = temperature;
       lastHumidity = humidity;
-
-      Serial.println("---- Environment Data ----");
-      Serial.print("Temperature: ");
-      Serial.print(temperature);
-      Serial.println(" C");
-
-      Serial.print("Humidity: ");
-      Serial.print(humidity);
-      Serial.println(" %");
-
-      Serial.println("---------------------------");
     }
   }
 
   // --------- Wetness Sensor ----------
   if (currentMillis - lastMoistureRead >= MOISTURE_INTERVAL) {
-
     lastMoistureRead = currentMillis;
-
     int rawValue = analogRead(MOISTURE_PIN);
-
-    int wetness = 4095 - rawValue;
-    wetness = wetness / 4;
+    int wetness = (4095 - rawValue) / 4;
     lastWetness = wetness;
 
-    Serial.print("Wetness Level: ");
-    Serial.println(wetness);
-
     if (wetness > WETNESS_THRESHOLD && !servoActive) {
-
       Serial.println("!!!!! Pee Detected !!!!!");
-
       servoActive = true;
       servoDir = 1;
       swingCount = 0;
@@ -211,30 +204,19 @@ void loop() {
 
   // --------- Sound Sensor ----------
   int rawSound = analogRead(SOUND_PIN);
-
   baseline = (baseline * 9 + rawSound) / 10;
-
-  int soundValue = rawSound - baseline;
-
-  if (soundValue < 0) soundValue = 0;
-
-  soundValue = soundValue * 5;
+  int soundValue = max(0, (rawSound - baseline) * 5);
   lastSound = soundValue;
 
-  Serial.print("Sound Level: ");
-  Serial.println(soundValue);
-
   if (soundValue >= SOUND_THRESHOLD && !servoActive) {
-
     Serial.println("!!!!! Cry Detected !!!!!");
-
     servoActive = true;
     servoDir = 1;
     swingCount = 0;
     maxSwings = 2;
   }
 
-  // --------- Push to IoT API (interval) ----------
+  // --------- Push to IoT API ----------
   if (currentMillis - lastApiPush >= API_POST_INTERVAL) {
     lastApiPush = currentMillis;
     pushReadingsToApi();
@@ -242,34 +224,19 @@ void loop() {
 
   // --------- Servo Motion ----------
   if (servoActive) {
-
     if (currentMillis - lastServoMove >= SERVO_STEP_DELAY) {
-
       lastServoMove = currentMillis;
-
       servoPos += 5 * servoDir;
 
-      if (servoPos >= SERVO_MAX) {
-        servoPos = SERVO_MAX;
-        servoDir = -1;
-        swingCount++;
-      }
-
-      if (servoPos <= SERVO_MIN) {
-        servoPos = SERVO_MIN;
-        servoDir = 1;
-        swingCount++;
-      }
+      if (servoPos >= SERVO_MAX) { servoPos = SERVO_MAX; servoDir = -1; swingCount++; }
+      if (servoPos <= SERVO_MIN) { servoPos = SERVO_MIN; servoDir = 1; swingCount++; }
 
       myServo.write(servoPos);
 
       if (swingCount >= maxSwings * 2) {
-
         Serial.println("Servo swings completed");
-
         servoActive = false;
         servoPos = 90;
-
         myServo.write(servoPos);
       }
     }

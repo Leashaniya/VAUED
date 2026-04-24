@@ -20,7 +20,17 @@ const SENSOR_LABELS = {
   "2": "Humidity",
   "3": "Wetness",
   "4": "Sound",
+  "5": "Baby Safety",
 };
+
+function routeError(res, scope, fallbackMessage, err) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.error(`[readings] ${scope}:`, detail);
+  return res.status(500).json({
+    error: fallbackMessage,
+    ...(process.env.NODE_ENV === "production" ? {} : { detail }),
+  });
+}
 
 function normalizeReading(raw) {
   if (raw == null) return { error: "reading is required (a single number)" };
@@ -34,6 +44,7 @@ function readingJson(doc) {
     id: doc._id,
     sensorId: doc.sensorId,
     reading: doc.reading,
+    ...(doc.sensorId === "5" ? { status: Boolean(doc.status) } : {}),
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt).toISOString(),
   };
@@ -107,8 +118,8 @@ router.get("/", async (req, res) => {
         })
       ),
     });
-  } catch {
-    return res.status(500).json({ error: "Failed to load readings" });
+  } catch (err) {
+    return routeError(res, "GET /", "Failed to load readings", err);
   }
 });
 
@@ -157,8 +168,8 @@ router.get("/sensors/:sensorId", async (req, res) => {
         })
       ),
     });
-  } catch {
-    return res.status(500).json({ error: "Failed to load readings" });
+  } catch (err) {
+    return routeError(res, "GET /sensors/:sensorId", "Failed to load readings", err);
   }
 });
 
@@ -263,8 +274,8 @@ router.get("/chart", async (req, res) => {
         s4: p.s4,
       })),
     });
-  } catch {
-    return res.status(500).json({ error: "Failed to load chart data" });
+  } catch (err) {
+    return routeError(res, "GET /chart", "Failed to load chart data", err);
   }
 });
 
@@ -298,8 +309,8 @@ router.get("/current", async (_req, res) => {
     });
 
     return res.json({ labels: SENSOR_LABELS, sensors });
-  } catch {
-    return res.status(500).json({ error: "Failed to load current readings" });
+  } catch (err) {
+    return routeError(res, "GET /current", "Failed to load current readings", err);
   }
 });
 
@@ -324,8 +335,8 @@ router.get("/:id", async (req, res) => {
         updatedAt: row.updatedAt,
       })
     );
-  } catch {
-    return res.status(500).json({ error: "Failed to load reading" });
+  } catch (err) {
+    return routeError(res, "GET /:id", "Failed to load reading", err);
   }
 });
 
@@ -369,8 +380,8 @@ router.post("/sensors/:sensorId/batch", async (req, res) => {
       readings: payload,
       ...(errors.length ? { skipped: errors } : {}),
     });
-  } catch {
-    return res.status(500).json({ error: "Failed to store batch readings" });
+  } catch (err) {
+    return routeError(res, "POST /sensors/:sensorId/batch", "Failed to store batch readings", err);
   }
 });
 
@@ -385,18 +396,23 @@ router.post("/sensors/:sensorId", async (req, res) => {
       error: `sensorId must be one of: ${ALLOWED_SENSOR_IDS.join(", ")}`,
     });
   }
-  const { reading } = req.body ?? {};
+  const { reading, status } = req.body ?? {};
   const norm = normalizeReading(reading);
   if (norm.error) return res.status(400).json({ error: norm.error });
 
   try {
-    const doc = await SensorReading.create({
+    const payload = {
       sensorId: sid,
       reading: norm.value,
-    });
+    };
+    if (sid === "5") {
+      payload.status = typeof status === "boolean" ? status : norm.value >= 0.5;
+    }
+
+    const doc = await SensorReading.create(payload);
     return res.status(201).json(readingJson(doc));
-  } catch {
-    return res.status(500).json({ error: "Failed to store reading" });
+  } catch (err) {
+    return routeError(res, "POST /sensors/:sensorId", "Failed to store reading", err);
   }
 });
 

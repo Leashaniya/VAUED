@@ -6,6 +6,15 @@ import { jwtAuth } from "../middleware/auth.js";
 
 const router = Router();
 
+function routeError(res, scope, fallbackMessage, err) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.error(`[auth] ${scope}:`, detail);
+  return res.status(500).json({
+    error: fallbackMessage,
+    ...(process.env.NODE_ENV === "production" ? {} : { detail }),
+  });
+}
+
 function issueToken(user) {
   const secret = process.env.JWT_SECRET;
   return jwt.sign(
@@ -50,8 +59,8 @@ router.post("/register", async (req, res) => {
     });
     const token = issueToken(user);
     return res.status(201).json({ token, user: sanitizeUser(user) });
-  } catch {
-    return res.status(500).json({ error: "failed to register user" });
+  } catch (err) {
+    return routeError(res, "POST /register", "failed to register user", err);
   }
 });
 
@@ -72,8 +81,8 @@ router.post("/login", async (req, res) => {
 
     const token = issueToken(user);
     return res.json({ token, user: sanitizeUser(user) });
-  } catch {
-    return res.status(500).json({ error: "failed to login" });
+  } catch (err) {
+    return routeError(res, "POST /login", "failed to login", err);
   }
 });
 
@@ -82,8 +91,8 @@ router.get("/me", jwtAuth, async (req, res) => {
     const user = await User.findById(req.auth.userId).lean();
     if (!user) return res.status(404).json({ error: "user not found" });
     return res.json({ user: sanitizeUser(user) });
-  } catch {
-    return res.status(500).json({ error: "failed to load current user" });
+  } catch (err) {
+    return routeError(res, "GET /me", "failed to load current user", err);
   }
 });
 
