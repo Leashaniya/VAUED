@@ -21,6 +21,7 @@ const SENSOR_LABELS = {
   "3": "Wetness",
   "4": "Sound",
   "5": "Baby Safety",
+  "6": "LDR2",
 };
 
 function routeError(res, scope, fallbackMessage, err) {
@@ -44,7 +45,6 @@ function readingJson(doc) {
     id: doc._id,
     sensorId: doc.sensorId,
     reading: doc.reading,
-    ...(doc.sensorId === "5" ? { status: Boolean(doc.status) } : {}),
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt).toISOString(),
   };
@@ -71,7 +71,7 @@ function parseOptionalIso(name, raw) {
 
 /**
  * GET /api/readings
- * Query: sensorId? (only here — optional filter 1–4), from?, to?, limit?, skip?
+ * Query: sensorId? (optional filter 1–6), from?, to?, limit?, skip?
  * Omit sensorId to list all sensors; or narrow with sensorId without using the path route.
  */
 router.get("/", async (req, res) => {
@@ -174,8 +174,8 @@ router.get("/sensors/:sensorId", async (req, res) => {
 });
 
 /**
- * GET /api/readings/chart?range=live|1h|24h|week|month&sensorId? (optional 1–4)
- * Returns time-bucketed averages for Recharts: points[{ t, s1..s4 }].
+ * GET /api/readings/chart?range=live|1h|24h|week|month&sensorId? (optional 1–6)
+ * Returns time-bucketed averages for Recharts: points[{ t, s1..s6 }].
  */
 router.get("/chart", async (req, res) => {
   const rangeKey = String(req.query.range ?? "1h");
@@ -245,6 +245,8 @@ router.get("/chart", async (req, res) => {
           s2: null,
           s3: null,
           s4: null,
+          s5: null,
+          s6: null,
         });
       }
       const slot = `s${row.sensorId}`;
@@ -272,6 +274,8 @@ router.get("/chart", async (req, res) => {
         s2: p.s2,
         s3: p.s3,
         s4: p.s4,
+        s5: p.s5,
+        s6: p.s6,
       })),
     });
   } catch (err) {
@@ -281,7 +285,7 @@ router.get("/chart", async (req, res) => {
 
 /**
  * GET /api/readings/current
- * Latest sample per sensor (1–4), always returned in order even if null.
+ * Latest sample per sensor (1–6), always returned in order even if null.
  */
 router.get("/current", async (_req, res) => {
   try {
@@ -396,7 +400,7 @@ router.post("/sensors/:sensorId", async (req, res) => {
       error: `sensorId must be one of: ${ALLOWED_SENSOR_IDS.join(", ")}`,
     });
   }
-  const { reading, status } = req.body ?? {};
+  const { reading } = req.body ?? {};
   const norm = normalizeReading(reading);
   if (norm.error) return res.status(400).json({ error: norm.error });
 
@@ -405,10 +409,6 @@ router.post("/sensors/:sensorId", async (req, res) => {
       sensorId: sid,
       reading: norm.value,
     };
-    if (sid === "5") {
-      payload.status = typeof status === "boolean" ? status : norm.value >= 0.5;
-    }
-
     const doc = await SensorReading.create(payload);
 
     // ML anomaly check - runs silently, never breaks main flow

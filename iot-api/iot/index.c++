@@ -24,7 +24,7 @@ char pass[] = "12345678";
 #define SENSOR_HUMIDITY "2"
 #define SENSOR_WETNESS "3"
 #define SENSOR_SOUND "4"
-#define SENSOR_LDR "5"  // New Sensor ID for Light Status
+#define SENSOR_BABY_SAFETY "5"
 
 // --------------------- Sensor Pins ---------------------
 #define DHTPIN 4
@@ -57,7 +57,9 @@ float lastTemp = NAN;
 float lastHumidity = NAN;
 int lastWetness = 0;
 int lastSound = 0;
-int lastLdrStatus = 1; // 1 for safe, 0 for unsafe
+int lastLdr1Status = 1;
+int lastLdr2Status = 1;
+int lastBabySafety = 1;
 bool haveDht = false;
 
 // --------------------- Servo Variables ---------------------
@@ -114,7 +116,7 @@ void pushReadingsToApi() {
   }
   postReading(SENSOR_WETNESS, (double)lastWetness);
   postReading(SENSOR_SOUND, (double)lastSound);
-  postReading(SENSOR_LDR, (double)lastLdrStatus); // Push LDR status to API
+  postReading(SENSOR_BABY_SAFETY, (double)lastBabySafety);
 }
 
 void setup() {
@@ -164,14 +166,16 @@ void loop() {
   int ldrValue = digitalRead(LDR_PIN);
   int ldrValue2 = digitalRead(LDR_PIN_2);
 
-  if (ldrValue == HIGH || ldrValue2 == HIGH) {
-    // If either sensor detects low light (assuming HIGH means dark for your sensor)
-    if(lastLdrStatus != 0) Serial.println("Baby is unsafe (low light detected)");
-    lastLdrStatus = 0; 
-  } else {
-    if(lastLdrStatus != 1) Serial.println("Baby is safe (light intact)");
-    lastLdrStatus = 1;
-  }
+  lastLdr1Status = ldrValue == HIGH ? 0 : 1;
+  lastLdr2Status = ldrValue2 == HIGH ? 0 : 1;
+  const bool babySafe = (lastLdr1Status == 1 && lastLdr2Status == 1);
+  lastBabySafety = babySafe ? 1 : 0;
+  Serial.printf(
+    "LDR1=%s LDR2=%s => baby=%s\n",
+    lastLdr1Status == 1 ? "detect" : "miss",
+    lastLdr2Status == 1 ? "detect" : "miss",
+    babySafe ? "safe" : "unsafe"
+  );
 
   // --------- DHT11 ----------
   if (currentMillis - lastDHTRead >= DHT_INTERVAL) {

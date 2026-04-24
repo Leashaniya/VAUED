@@ -18,22 +18,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function buildPayload(tick) {
   const t = tick * 0.05;
-  const safetyState = Math.sin(t * 0.9) > -0.25;
+  // Two physical LDR beams contribute to one final baby safety state.
+  const ldr1Detected = Math.sin(t * 0.9) > -0.25;
+  const ldr2Detected = Math.sin(t * 1.1 + 0.7) > -0.2;
+  const babySafe = ldr1Detected && ldr2Detected;
   return {
     "1": 22 + 3 * Math.sin(t) + rand(-0.3, 0.3), // temperature
     "2": 50 + 10 * Math.cos(t * 0.7) + rand(-0.3, 0.3), // humidity
     "3": 400 + 150 * Math.sin(t * 1.3) + rand(-6, 6), // wetness
     "4": Math.max(0, 200 + 300 * Math.abs(Math.sin(t * 2.1)) + rand(-20, 20)), // sound
-    // 1 = safe, 0 = unsafe (also sent as explicit boolean in request body)
-    "5": safetyState ? 1 : 0,
+    "5": babySafe ? 1 : 0, // Final combined baby safety result
   };
 }
 
 async function postReading(sensorId, reading) {
-  const body =
-    sensorId === "5"
-      ? { reading: Number(reading.toFixed(4)), status: reading >= 0.5 }
-      : { reading: Number(reading.toFixed(4)) };
+  const body = { reading: Number(reading.toFixed(4)) };
   const res = await fetch(`${BASE_URL}/api/readings/sensors/${sensorId}`, {
     method: "POST",
     headers: {
@@ -63,10 +62,11 @@ while (!stopped) {
   const values = buildPayload(tick);
   try {
     await Promise.all(SENSOR_IDS.map((id) => postReading(id, values[id])));
+    const babySafe = values["5"] >= 0.5;
     console.log(
       `tick ${tick} | t=${values["1"].toFixed(2)} h=${values["2"].toFixed(2)} w=${values["3"].toFixed(
         2
-      )} s=${values["4"].toFixed(2)} baby=${values["5"] >= 0.5 ? "safe" : "unsafe"} | OK`
+      )} s=${values["4"].toFixed(2)} baby=${babySafe ? "safe" : "unsafe"} | OK`
     );
   } catch (err) {
     console.error(`tick ${tick} | FAIL`, err instanceof Error ? err.message : String(err));

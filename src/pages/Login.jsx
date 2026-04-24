@@ -112,7 +112,7 @@ export function Login({ onLoginSuccess }) {
     setSubmitting(true)
     try {
       const user = await login(email.trim(), password)
-      onLoginSuccess?.(user)
+      onLoginSuccess?.(user, { source: 'login' })
     } catch (err) {
       setError(err?.message || 'Sign in failed. Check your email and password, then try again.')
     } finally {
@@ -152,7 +152,7 @@ export function Login({ onLoginSuccess }) {
       })
       setRegisterNotice('Account created successfully. Signing you in…')
       await new Promise((r) => setTimeout(r, 550))
-      onLoginSuccess?.(user)
+      onLoginSuccess?.(user, { source: 'register' })
     } catch (err) {
       setRegisterNotice('')
       const msg = err?.message || ''
