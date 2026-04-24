@@ -410,9 +410,72 @@ router.post("/sensors/:sensorId", async (req, res) => {
     }
 
     const doc = await SensorReading.create(payload);
+
+    // ML anomaly check - runs silently, never breaks main flow
+    if (req.params.sensorId === "1") {
+      try {
+        const latestHumidity = await SensorReading.findOne({ sensorId: "2" }).sort({ createdAt: -1 });
+        if (latestHumidity) {
+          const mlRes = await fetch("http://localhost:5001/detect-anomaly", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ temperature: norm.value, humidity: latestHumidity.reading }),
+          });
+          const mlData = await mlRes.json();
+          if (mlData.isAnomaly) {
+            console.log(
+              `[ML ALERT] Anomaly detected — temp: ${norm.value} humidity: ${latestHumidity.reading} score: ${mlData.score}`
+            );
+          }
+        }
+      } catch {
+        // Flask not running, skip silently
+      }
+    }
+
     return res.status(201).json(readingJson(doc));
   } catch (err) {
     return routeError(res, "POST /sensors/:sensorId", "Failed to store reading", err);
+  }
+});
+
+// ML endpoints
+router.get("/ml/feature-importance", async (_req, res) => {
+  try {
+    const response = await fetch("http://localhost:5001/feature-importance");
+    const data = await response.json();
+    res.json(data);
+  } catch {
+    res.status(503).json({ error: "ML service unavailable" });
+  }
+});
+
+router.get("/ml/forecast", async (_req, res) => {
+  try {
+    const response = await fetch("http://localhost:5001/forecast");
+    const data = await response.json();
+    res.json(data);
+  } catch {
+    res.status(503).json({ error: "ML service unavailable" });
+  }
+});
+
+router.get("/ml/anomaly-status", async (_req, res) => {
+  try {
+    const latestTemp = await SensorReading.findOne({ sensorId: "1" }).sort({ createdAt: -1 });
+    const latestHumidity = await SensorReading.findOne({ sensorId: "2" }).sort({ createdAt: -1 });
+    if (!latestTemp || !latestHumidity) {
+      return res.status(404).json({ error: "No sensor data available" });
+    }
+    const response = await fetch("http://localhost:5001/detect-anomaly", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ temperature: latestTemp.reading, humidity: latestHumidity.reading }),
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch {
+    res.status(503).json({ error: "ML service unavailable" });
   }
 });
 
