@@ -83,13 +83,14 @@ export function buildDashboardChatbotContext({ live, activeBaby, loading, loadEr
       wetnessWet: t.wetnessWet,
       tempSafeMinC: t.tempSafeMinC,
       tempSafeMaxC: t.tempSafeMaxC,
+      babySafeMin: t.babySafeMin,
     },
     liveThresholdsNarration: [
       `Cry status: latest sound ≥ ${t.soundCryOn} suggests crying; values between ${t.soundCryOff} and ${t.soundCryOn} can still count as crying if the hour recently peaked above ${t.soundCryOn} (short hysteresis).`,
       `“Loud” bars use sound ≥ ${t.soundDanger} (stress cue, not a medical diagnosis).`,
       `Wet status: wetness ≥ ${t.wetnessWet} reads as wet for the card; today’s donut counts wet vs dry samples from today’s 24h stream (and may align with the latest reading).`,
       `Temperature comfort band for this demo: ${t.tempSafeMinC}°C–${t.tempSafeMaxC}°C.`,
-      `Danger / Attention: combines wet, temperature-out-of-range, and very loud sound; it lights up when multiple risk cues stack (see live console validation logs in dev).`,
+      `Danger status uses the backend final Baby Safety stream (sensor 5): values ≥ ${t.babySafeMin} show Baby Safe, otherwise Baby Unsafe.`,
       `Average cry duration (live card): estimated from the last hour of sound buckets — time above the cry-on threshold is grouped into short episodes and averaged (not a clinical measure).`,
     ].join(' '),
   }

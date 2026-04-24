@@ -6,6 +6,7 @@ const SENSOR = {
   humidity: '2',
   wetness: '3',
   sound: '4',
+  babySafety: '5',
 }
 
 /**
@@ -22,6 +23,7 @@ export const LIVE_SENSOR_THRESHOLDS = {
   wetnessWet: 480,
   tempSafeMinC: 20,
   tempSafeMaxC: 30,
+  babySafeMin: 0.5,
 }
 
 const THRESHOLDS = LIVE_SENSOR_THRESHOLDS
@@ -198,7 +200,6 @@ function buildLiveNotifications({
   tempC,
   sound,
   wetness,
-  riskSignals,
   latestAt,
 }) {
   const time = formatRelativeTime(latestAt)
@@ -210,7 +211,7 @@ function buildLiveNotifications({
       id: `danger-${latestAt ?? Date.now()}`,
       title: 'Attention needed',
       time,
-      detail: `${who}Multiple live signals suggest checking the nursery (${riskSignals} active cues).`,
+      detail: `${who}A safety beam has been interrupted. Please check the baby area.`,
       tone: 'orange',
       icon: 'alert',
     })
@@ -274,7 +275,7 @@ function buildLiveGuidance({
 }) {
   const label = babyName ? `${babyName}: ` : ''
   if (danger) {
-    return `${label}Several live readings suggest checking the nursery soon.`
+    return `${label}A safety beam has been interrupted, so a quick check is recommended.`
   }
   if (wetNow) {
     return `${label}Wetness is elevated — a quick diaper check may help.`
@@ -286,7 +287,7 @@ function buildLiveGuidance({
     return `${label}Sound activity is elevated — your baby may need soothing.`
   }
   if (Number.isFinite(tempC)) {
-    return `${label}Room temperature looks within range and live signals are calm.`
+    return `${label}Both safety beams are intact.`
   }
   return `${label}Current live conditions look stable.`
 }
@@ -296,6 +297,7 @@ function transformLiveSnapshot(current, chart1h, chart24h, context = {}) {
   const tempC = getSensorValue(current, SENSOR.temperature)
   const wetness = getSensorValue(current, SENSOR.wetness)
   const sound = getSensorValue(current, SENSOR.sound)
+  const babySafety = getSensorValue(current, SENSOR.babySafety)
   const humidity = getSensorValue(current, SENSOR.humidity)
 
   const oneHourSounds = (chart1h?.points ?? [])
@@ -313,8 +315,8 @@ function transformLiveSnapshot(current, chart1h, chart24h, context = {}) {
     Number.isFinite(tempC) &&
     (tempC < THRESHOLDS.tempSafeMinC || tempC > THRESHOLDS.tempSafeMaxC)
   const soundDanger = Number.isFinite(sound) && sound >= THRESHOLDS.soundDanger
-  const riskSignals = [wetNow, tempOutOfRange, soundDanger].filter(Boolean).length
-  const danger = riskSignals >= 2 || (soundDanger && wetNow)
+  const babySafe = Number.isFinite(babySafety) && babySafety >= THRESHOLDS.babySafeMin
+  const danger = !babySafe
 
   const avgCryDurationMin = estimateCryDuration(chart1h)
   const hourlySoundData = buildHourlySoundData(chart1h)
@@ -331,7 +333,6 @@ function transformLiveSnapshot(current, chart1h, chart24h, context = {}) {
     tempC,
     sound,
     wetness,
-    riskSignals,
     latestAt,
   })
 
@@ -372,13 +373,11 @@ function transformLiveSnapshot(current, chart1h, chart24h, context = {}) {
       latestTemperatureC: Number.isFinite(tempC) ? Number(tempC.toFixed(2)) : null,
       latestWetness: Number.isFinite(wetness) ? Math.round(wetness) : null,
       latestSound: Number.isFinite(sound) ? Math.round(sound) : null,
+      latestBabySafety: Number.isFinite(babySafety) ? Number(babySafety.toFixed(3)) : null,
       rules: {
-        tempOutOfRange,
-        wetNow,
-        soundDanger,
+        babySafe,
       },
-      riskSignals,
-      finalStatus: danger ? 'Attention' : 'Secure',
+      finalStatus: danger ? 'Baby Unsafe' : 'Baby Safe',
     })
   }
 
@@ -416,10 +415,10 @@ function transformLiveSnapshot(current, chart1h, chart24h, context = {}) {
             : 'Temperature stream active',
       },
       danger: {
-        value: danger ? 'Attention' : 'Secure',
+        value: danger ? 'Baby Unsafe' : 'Baby Safe',
         footer: danger
-          ? 'One or more live conditions are outside the safe band'
-          : 'No critical risk signal detected',
+          ? 'A safety beam has been interrupted'
+          : 'Both safety beams are intact',
         footerGood: !danger,
       },
     },

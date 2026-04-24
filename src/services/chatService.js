@@ -393,7 +393,7 @@ function localDashboardReply(q, context, style) {
 
   if (q.includes('danger') || q.includes('attention') || q.includes('secure')) {
     return withFollowUp(
-      `Danger status is **${cards?.danger?.value ?? '—'}**. “Attention” means multiple live cues stacked (for example very loud sound, wet, and/or temperature stress) — it’s a **nudge to check the nursery**, not an emergency diagnosis. ${cards?.danger?.footer || ''}`,
+      `Danger status is **${cards?.danger?.value ?? '—'}**. It follows the backend's final baby safety result directly: safe -> **Baby Safe**, unsafe -> **Baby Unsafe**. ${cards?.danger?.footer || ''}`,
       ['what should parents monitor now', 'how do thresholds work'],
       style,
     )

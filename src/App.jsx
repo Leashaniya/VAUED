@@ -36,6 +36,7 @@ export default function App() {
   const [activeBabyId, setActiveBabyId] = useState(() => loadActiveBabyId() || '')
   const [showAddBaby, setShowAddBaby] = useState(false)
   const [showSwitchBaby, setShowSwitchBaby] = useState(false)
+  const [pendingFirstTimeOnboarding, setPendingFirstTimeOnboarding] = useState(false)
   /** Subtle confirmation after add/switch baby (non-toast, auto-dismiss). */
   const [bannerMessage, setBannerMessage] = useState('')
 
@@ -139,8 +140,9 @@ export default function App() {
     setBannerMessage('')
   }
 
-  async function handleLoginSuccess(nextUser) {
+  async function handleLoginSuccess(nextUser, meta = {}) {
     setUser(nextUser)
+    setPendingFirstTimeOnboarding(meta?.source === 'register')
     try {
       const babies = await getBabies()
       setBabyProfiles(babies)
@@ -156,10 +158,11 @@ export default function App() {
 
   // First-run onboarding: no baby profiles → open add modal (existing) + optional strip under header.
   useEffect(() => {
-    if (user && babyProfiles.length === 0) {
+    if (pendingFirstTimeOnboarding && user && babyProfiles.length === 0) {
       setShowAddBaby(true)
+      setPendingFirstTimeOnboarding(false)
     }
-  }, [user, babyProfiles.length])
+  }, [pendingFirstTimeOnboarding, user, babyProfiles.length])
 
   if (!user) {
     if (!authChecked) return null
