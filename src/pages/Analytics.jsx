@@ -109,12 +109,6 @@ export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
   const [selectedDonutSegment, setSelectedDonutSegment] = useState(null)
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
-  const [forecastData, setForecastData] = useState(null)
-  const [forecastError, setForecastError] = useState('')
-  const [featureImportance, setFeatureImportance] = useState(null)
-  const [featureError, setFeatureError] = useState('')
-  const [anomalyStatus, setAnomalyStatus] = useState(null)
-  const [anomalyError, setAnomalyError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -184,58 +178,6 @@ export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
     // eslint-disable-next-line no-console
     console.log('[Analytics VALIDATION]', v)
   }, [analytics])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadForecast() {
-      try {
-        const res = await fetch('/api/readings/ml/forecast')
-        if (!res.ok) throw new Error('forecast unavailable')
-        const data = await res.json()
-        if (cancelled) return
-        setForecastData(data)
-        setForecastError('')
-      } catch {
-        if (!cancelled) setForecastError('ML service not running')
-      }
-    }
-
-    async function loadFeatureImportance() {
-      try {
-        const res = await fetch('/api/readings/ml/feature-importance')
-        if (!res.ok) throw new Error('feature importance unavailable')
-        const data = await res.json()
-        if (cancelled) return
-        setFeatureImportance(data)
-        setFeatureError('')
-      } catch {
-        if (!cancelled) setFeatureError('ML service not running')
-      }
-    }
-
-    async function loadAnomalyStatus() {
-      try {
-        const res = await fetch('/api/readings/ml/anomaly-status')
-        if (!res.ok) throw new Error('anomaly unavailable')
-        const data = await res.json()
-        if (cancelled) return
-        setAnomalyStatus(data)
-        setAnomalyError('')
-      } catch {
-        if (!cancelled) setAnomalyError('ML service not running')
-      }
-    }
-
-    loadForecast()
-    loadFeatureImportance()
-    loadAnomalyStatus()
-    const t = setInterval(loadAnomalyStatus, 30000)
-    return () => {
-      cancelled = true
-      clearInterval(t)
-    }
-  }, [])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -310,41 +252,6 @@ export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
   const avgMinDisplay = Number.isFinite(avgMinPerDaySummary)
     ? avgMinPerDaySummary
     : 0
-  const forecastBars = useMemo(() => {
-    const actual = Array.isArray(forecastData?.last_7_days) ? forecastData.last_7_days : []
-    const rows = actual.map((value, idx) => ({
-      label: `D${idx + 1}`,
-      value: Number(value) || 0,
-      predicted: false,
-    }))
-    if (forecastData && Number.isFinite(Number(forecastData.next_day_predicted_cries))) {
-      rows.push({
-        label: 'Tmr',
-        value: Number(forecastData.next_day_predicted_cries) || 0,
-        predicted: true,
-      })
-    }
-    return rows
-  }, [forecastData])
-  const featureRows = useMemo(() => {
-    if (!featureImportance || typeof featureImportance !== 'object') return []
-    return Object.entries(featureImportance)
-      .map(([name, value]) => ({ name, value: Number(value) || 0 }))
-      .sort((a, b) => b.value - a.value)
-  }, [featureImportance])
-  const forecastTrend = String(forecastData?.trend || '').toLowerCase()
-  const trendPillStyles =
-    forecastTrend === 'increasing'
-      ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-      : forecastTrend === 'decreasing'
-        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-        : 'text-cyan-700 dark:text-cyan-300'
-  const trendText =
-    forecastTrend === 'increasing'
-      ? '↑ Increasing'
-      : forecastTrend === 'decreasing'
-        ? '↓ Decreasing'
-        : '→ Stable'
 
   // Build chatbot input from already-processed dashboard state (not raw CSV parsing).
   const chatbotContext = useMemo(
@@ -502,53 +409,6 @@ export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
               )
             })}
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-100/80 bg-white p-5 shadow-sm dark:border-slate-700/60 dark:bg-[#1e293b] lg:p-6">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                Cry Forecast — Tomorrow
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white">ML Forecast</h3>
-            </div>
-            {!forecastError && (
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${trendPillStyles}`}>
-                {trendText}
-              </span>
-            )}
-          </div>
-          {forecastError ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">ML service not running</p>
-          ) : (
-            <>
-              <p className="text-4xl font-bold text-slate-900 dark:text-white">
-                {Number.isFinite(Number(forecastData?.next_day_predicted_cries))
-                  ? Number(forecastData.next_day_predicted_cries)
-                  : '—'}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Predicted cry episodes tomorrow</p>
-              <div className="mt-4 h-[180px] w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={forecastBars} margin={{ top: 8, right: 4, left: -12, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={dark ? '#334155' : '#f1f5f9'} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: dark ? '#94a3b8' : '#64748b', fontSize: 11 }}
-                    />
-                    <YAxis hide />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={28}>
-                      {forecastBars.map((entry, idx) => (
-                        <Cell key={`forecast-cell-${idx}`} fill={entry.predicted ? '#f59e0b' : 'var(--sbm-accent)'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
-          )}
         </div>
 
         {filter === 'custom' && (
@@ -934,73 +794,6 @@ export function Analytics({ dark, filter, setFilter, activeBaby = null }) {
               Average Daily Cry Duration (min)
             </div>
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-100/80 bg-white p-5 shadow-sm dark:border-slate-700/60 dark:bg-[#1e293b] lg:p-6">
-          <div className="mb-4">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              What triggers crying most?
-            </span>
-          </div>
-          {featureError ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">ML service not running</p>
-          ) : (
-            <div className="h-[240px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={featureRows} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={dark ? '#334155' : '#f1f5f9'} />
-                  <XAxis type="number" hide domain={[0, 1]} />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: dark ? '#94a3b8' : '#64748b', fontSize: 11 }}
-                    width={90}
-                  />
-                  <Bar dataKey="value" fill="var(--sbm-accent)" radius={[0, 6, 6, 0]} maxBarSize={24}>
-                    {featureRows.map((entry) => (
-                      <Cell key={`fi-${entry.name}`} fill="var(--sbm-accent)" />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
-                {featureRows.map((entry) => (
-                  <span key={`fi-label-${entry.name}`}>
-                    {entry.name}: {Math.round(entry.value * 100)}%
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-slate-100/80 bg-white p-5 shadow-sm dark:border-slate-700/60 dark:bg-[#1e293b] lg:p-6">
-          <div className="mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              Room Condition — ML Analysis
-            </span>
-          </div>
-          {anomalyError ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">ML service not running</p>
-          ) : (
-            <div>
-              <p
-                className={`text-lg font-semibold ${
-                  anomalyStatus?.isAnomaly
-                    ? 'text-amber-700 dark:text-amber-400'
-                    : 'text-emerald-700 dark:text-emerald-400'
-                }`}
-              >
-                {anomalyStatus?.isAnomaly ? 'Anomaly Detected' : 'Normal Conditions'}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Anomaly score:{' '}
-                {Number.isFinite(Number(anomalyStatus?.score)) ? Number(anomalyStatus.score).toFixed(4) : '—'}
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-700/60 dark:bg-[#1e293b] lg:p-5">

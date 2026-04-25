@@ -1,0 +1,56 @@
+{
+  "next_day_predicted_cries": 3,
+  "next_day_predicted_avg_temperature": 21.5,
+  "next_day_date": "2026-03-01",
+  "trend": "stable",
+  "last_7_days": [
+    1,
+    6,
+    6,
+    3,
+    2,
+    4,
+    1
+  ],
+  "last_7_days_series": [
+    {
+      "date": "2026-02-22",
+      "cry_count": 1,
+      "avg_temperature": 16.8
+    },
+    {
+      "date": "2026-02-23",
+      "cry_count": 6,
+      "avg_temperature": 24.0
+    },
+    {
+      "date": "2026-02-24",
+      "cry_count": 6,
+      "avg_temperature": 22.4
+    },
+    {
+      "date": "2026-02-25",
+      "cry_count": 3,
+      "avg_temperature": 21.0
+    },
+    {
+      "date": "2026-02-26",
+      "cry_count": 2,
+      "avg_temperature": 18.0
+    },
+    {
+      "date": "2026-02-27",
+      "cry_count": 4,
+      "avg_temperature": 22.3
+    },
+    {
+      "date": "2026-02-28",
+      "cry_count": 1,
+      "avg_temperature": 21.0
+    }
+  ],
+  "based_on": {
+    "today_avg_temperature": 21.0,
+    "today_wet_events": 3
+  }
+}

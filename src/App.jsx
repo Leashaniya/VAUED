@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { Dashboard } from './pages/Dashboard'
 import { Analytics } from './pages/Analytics'
+import { MlInsights } from './pages/MlInsights'
 import { Login } from './pages/Login'
 import { BabyProfileModal } from './components/BabyProfileModal'
 import { SwitchBabyModal } from './components/SwitchBabyModal'
@@ -224,8 +225,10 @@ export default function App() {
               onNotificationsChange={setDashboardNotifications}
               activeBaby={activeBaby}
             />
-          ) : (
+          ) : page === 'analytics' ? (
             <Analytics dark={dark} filter={filter} setFilter={setFilter} activeBaby={activeBaby} />
+          ) : (
+            <MlInsights dark={dark} />
           )}
         </div>
       </div>

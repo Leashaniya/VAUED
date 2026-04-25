@@ -1,3 +1,5 @@
+import { IOT_API_BASE_URL } from '../config/iotApiBase'
+
 /**
  * Smart Baby Monitor — visual analytics chat assistant (LLM + grounded fallbacks).
  *
@@ -788,9 +790,8 @@ export async function getChatbotReply({ message, context }) {
   if (isAmbiguousPrompt(q)) return ambiguousPromptReply(context, style)
   if (isOffTopic(q)) return redirectOffTopic(style)
 
-  const apiBase = import.meta.env.VITE_IOT_API_BASE_URL || 'http://127.0.0.1:4000'
   try {
-    const res = await fetch(`${apiBase}/api/chatbot/query`, {
+    const res = await fetch(`${IOT_API_BASE_URL}/api/chatbot/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, context }),

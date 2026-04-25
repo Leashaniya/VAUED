@@ -28,37 +28,57 @@ def load_models():
 
     try:
         anomaly_model = joblib.load("anomaly_model.pkl")
+        print("[OK] anomaly_model.pkl loaded")
     except Exception as err:
         print(f"[WARN] anomaly_model.pkl not loaded: {err}")
 
     try:
         cry_model = joblib.load("cry_model.pkl")
+        print("[OK] cry_model.pkl loaded")
     except Exception as err:
         print(f"[WARN] cry_model.pkl not loaded: {err}")
 
     try:
         forecast_model = joblib.load("forecast_model.pkl")
+        print("[OK] forecast_model.pkl loaded")
     except Exception as err:
         print(f"[WARN] forecast_model.pkl not loaded: {err}")
 
 
-@app.post("/detect-anomaly")
+@app.route("/detect-anomaly", methods=["POST"])
 def detect_anomaly():
     if anomaly_model is None:
         return jsonify({"error": "Model not trained yet"}), 503
 
     data = request.get_json(silent=True) or {}
-    temperature = float(data.get("temperature", 0.0))
-    humidity = float(data.get("humidity", 0.0))
 
-    X = np.array([[temperature, humidity]], dtype=float)
-    pred = int(anomaly_model.predict(X)[0])  # -1 anomaly, 1 normal
+    # Temperature only — the only true environmental room condition
+    temperature = float(data.get("temperature", 0.0))
+
+    X = np.array([[temperature]])
+    pred = int(anomaly_model.predict(X)[0])
     score = float(anomaly_model.decision_function(X)[0])
 
-    return jsonify({"isAnomaly": pred == -1, "score": score})
+    # Determine reason
+    if pred == -1:
+        if temperature >= 30:
+            reason = "Room temperature is too high for baby"
+        elif temperature <= 15:
+            reason = "Room temperature is too low for baby"
+        else:
+            reason = "Temperature reading is outside normal range"
+    else:
+        reason = "Room temperature is within normal range"
+
+    return jsonify({
+        "isAnomaly": pred == -1,
+        "score": round(score, 4),
+        "temperature": temperature,
+        "reason": reason
+    })
 
 
-@app.get("/feature-importance")
+@app.route("/feature-importance", methods=["GET"])
 def feature_importance():
     path = "feature_importance.json"
     if not os.path.exists(path):
@@ -67,7 +87,7 @@ def feature_importance():
         return jsonify(json.load(f))
 
 
-@app.get("/forecast")
+@app.route("/forecast", methods=["GET"])
 def forecast():
     path = "forecast_result.json"
     if not os.path.exists(path):
@@ -76,6 +96,19 @@ def forecast():
         return jsonify(json.load(f))
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "models": {
+            "anomaly": anomaly_model is not None,
+            "cry": cry_model is not None,
+            "forecast": forecast_model is not None
+        }
+    })
+
+
 if __name__ == "__main__":
     load_models()
+    print("[ML Server] Starting on port 5001...")
     app.run(host="0.0.0.0", port=5001, debug=False)

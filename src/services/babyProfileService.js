@@ -1,6 +1,7 @@
+import { IOT_API_BASE_URL as API_BASE } from '../config/iotApiBase'
+
 const BABY_PROFILES_KEY = 'sbm_baby_profiles'
 const ACTIVE_BABY_KEY = 'sbm_active_baby_id'
-const API_BASE = import.meta.env.VITE_IOT_API_BASE_URL || 'http://127.0.0.1:4000'
 
 export const ACCENT_BY_GENDER = {
   boy: {

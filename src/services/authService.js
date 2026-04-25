@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_IOT_API_BASE_URL || 'http://127.0.0.1:4000'
+import { IOT_API_BASE_URL as API_BASE } from '../config/iotApiBase'
 const TOKEN_KEY = 'sbm_jwt_token'
 const USER_KEY = 'sbm_auth_user'
 

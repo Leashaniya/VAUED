@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, Baby } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Brain, Baby } from 'lucide-react'
 
 export function Sidebar({ active, onNavigate }) {
   const link =
@@ -39,6 +39,15 @@ export function Sidebar({ active, onNavigate }) {
         >
           <BarChart3 className="h-5 w-5 shrink-0" strokeWidth={2} />
           Analytics
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate('ml')}
+          className={`${link} ${active === 'ml' ? activeCls : inactive}`}
+          style={active === 'ml' ? { color: 'var(--sbm-accent)' } : undefined}
+        >
+          <Brain className="h-5 w-5 shrink-0" strokeWidth={2} />
+          ML insights
         </button>
       </nav>
     </aside>

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_IOT_API_BASE_URL || 'http://127.0.0.1:4000'
+import { IOT_API_BASE_URL as API_BASE_URL } from '../config/iotApiBase'
 const API_KEY = import.meta.env.VITE_IOT_API_KEY || 'my_secret_api_key_123'
 
 const SENSOR = {

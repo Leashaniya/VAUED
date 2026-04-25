@@ -1,0 +1,8 @@
+{
+  "temperature": 0.268,
+  "wetness": 0.0638,
+  "hour": 0.318,
+  "day_of_week": 0.2428,
+  "time_of_day": 0.062,
+  "temp_category": 0.0454
+}
